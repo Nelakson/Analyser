@@ -6,11 +6,12 @@ import cv2
 import numpy as np
 
 
+const_step = 80
 #Returns the number of dark/black pixels in each 5X5 grid
-def blackCount(im,dim):
+def blackCount(im):
 	b = 0
-	for x in range(dim):
-		for y in range(dim):
+	for x in range(const_step):
+		for y in range(const_step):
 			if im[x,y] != 255:
 				b += 1 
 	return b
@@ -24,11 +25,10 @@ def normalize_signature(sign):
 #Image shape must be square and dimensions must be a multiple of 5
 def grid_signature(im):
 	im_sign = np.zeros(25)
-	step = 80 					# 400/5
 	for i in range(5):
 		for j in range(5):
-			im_temp = im[i*step:i*step + step:1 , j*step:j*step + step:1]	# 5X5 grid extract
-			im_sign[i*5 + j] = blackCount(im_temp, step)
+			im_temp = im[i*const_step:i*const_step + const_step:1 , j*const_step:j*const_step + const_step:1]	# 5X5 grid extract
+			im_sign[i*5 + j] = blackCount(im_temp)
 	im_sign = normalize_signature(im_sign)		
 	return im_sign		
 
@@ -55,7 +55,7 @@ def image_preprocessing(imageFilename):
 	return im_bw
 
 #im1 and im2 are examples of some post-its. Try with some other examples as well.
-im1 = image_preprocessing('blue1b.jpg')
+im1 = image_preprocessing('blue1a.jpg')
 im2 = image_preprocessing('pink1b.jpg')
 compare(grid_signature(im1), grid_signature(im2))
 
