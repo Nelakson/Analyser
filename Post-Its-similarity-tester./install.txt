@@ -1,0 +1,10 @@
+test.py
+------------
+Run using the command: python test.py
+To compare two images, refer their names on the last few lines of the code.
+Presently, you will find examples for blue1b.jpg and pink1b.jpg
+
+Find some test data attached.
+
+The output prints/returns similar/True if the images are the same irrespective of lighting exposures.
+The output prints/returns not similar/False if the images are supposed to be different.
