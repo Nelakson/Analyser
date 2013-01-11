@@ -5,15 +5,19 @@
 import cv2
 import numpy as np
 
-
 const_step = 80
+
 #Returns the number of dark/black pixels in each 5X5 grid
+#The two commented lines can replace the actual code,to enhance speed
+#since for loops take time. 
 def blackCount(im):
+	#row, col = im.shape[:2]	
 	b = 0
 	for x in range(const_step):
 		for y in range(const_step):
 			if im[x,y] != 255:
 				b += 1 
+	#return row*col - cv2.countNonZero(im)
 	return b
 
 #Return normalized version of signatures(between 0 and 1)	
@@ -55,9 +59,9 @@ def image_preprocessing(imageFilename):
 	return im_bw
 
 #im1 and im2 are examples of some post-its. Try with some other examples as well.
-im1 = image_preprocessing('blue1a.jpg')
-im2 = image_preprocessing('pink1b.jpg')
-compare(grid_signature(im1), grid_signature(im2))
+#im1 = image_preprocessing('blue1b.jpg')
+#im2 = image_preprocessing('pink1b.jpg')
+#compare(grid_signature(im1), grid_signature(im2))
 
 
 
