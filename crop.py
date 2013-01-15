@@ -92,53 +92,46 @@ def get_square(square):
 	return square
 
 
-#Detect edges using Canny and draws contours around the squares
-#cv2.contourArea() is used to ignore small unnecessary squares.
-#cv2.GaussianBlur() and cv2.dilate() are used to remove noise.
-#'img' must be in HSV format.
-#The function returns an HSV image with a white boundary around the post-its. 
-def edge_detection(img):
-	img = cv2.GaussianBlur(img,(5,5),0)
-	for gray in cv2.split(img):
-		canny  = cv2.Canny(gray,50,200)
-		canny = cv2.dilate(canny,None,iterations = 1)
-		conts,hier = cv2.findContours(canny,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-		for cnt in conts:
-			approx = cv2.approxPolyDP(cnt,0.1*cv2.arcLength(cnt,True),True)
-			if len(approx)==4 and cv2.contourArea(cnt) > 2000:
-				cv2.drawContours(img,[cnt],0,(255,255,255),2)
-				print cv2.contourArea(cnt)
-
-	return img				
-
 
 #'img' must be in HSV format
 def blob(img,original_image):
+	#Remove noise.
+	img = cv2.medianBlur(img,21)
+	img = cv2.GaussianBlur(img,(0,0),3)
 
 	#Color blobbing for blue in opencv hsv format.
-	BLUE_MIN = np.array([85, 10, 10],np.uint8)
-	BLUE_MAX = np.array([130, 200, 200],np.uint8)
+	BLUE_MIN = np.array([80, 65, 65],np.uint8)
+	BLUE_MAX = np.array([130, 255, 255],np.uint8)
 	blue_threshed = cv2.inRange(img, BLUE_MIN, BLUE_MAX)
+	#cv2.imwrite('blue.jpg',blue_threshed)
 
-	#Color blobbing for pink in opencv hsv format.
-	PINK_MIN = np.array([150, 40, 40],np.uint8)
-	PINK_MAX = np.array([200, 255, 255],np.uint8)
-	pink_threshed = cv2.inRange(img	, PINK_MIN, PINK_MAX)
+	#Color blobbing for pink and purple in opencv hsv format.
+	PINK_MIN = np.array([120, 90, 90],np.uint8)
+	PINK_MAX = np.array([180, 255, 255],np.uint8)
+	pur_pink_threshed = cv2.inRange(img	, PINK_MIN, PINK_MAX)
+	#cv2.imwrite('pur_pink.jpg',pur_pink_threshed)
 
-	#'threshed' is  a binary image with a defined outline of all the post-its .
-	threshed = blue_threshed + pink_threshed
+	#Color blobbing for green in opencv hsv format.
+	GREEN_MIN = np.array([35, 65, 65],np.uint8)
+	GREEN_MAX = np.array([80, 255, 255],np.uint8)
+	green_threshed = cv2.inRange(img, GREEN_MIN, GREEN_MAX)
+	#cv2.imwrite('green.jpg',green_threshed)
+
+	#'threshed' is  a binary image with a defined outline of all the post-its.
+	threshed = blue_threshed + pur_pink_threshed + green_threshed
 	cv2.imwrite('result10.jpg',threshed)
 
-	contours, hierarchy = cv2.findContours(threshed,1, 2)
+	contours, hierarchy = cv2.findContours(threshed,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 	noOfPostIts = 0
 
 	for cnt in contours:
 		approx1 = cv2.approxPolyDP(cnt,0.1*cv2.arcLength(cnt,True),True)
-		if len(approx1)==4 and cv2.contourArea(cnt) > 2000:
+		if len(approx1)==4 and cv2.contourArea(cnt) > 10000:
 			cv2.drawContours(threshed,[cnt],0,(255,255,255),2)
 			#At this point, 'threshed' will be an image that identifies only the post-its.
 			#This can be used to verify that the correct post-its will be cropped.
 			square1 = approx1
+			print square1
 			print cv2.contourArea(cnt)
 			noOfPostIts += 1
 			square1 = get_square(square1)
@@ -150,18 +143,14 @@ def blob(img,original_image):
 	print noOfPostIts
 	return threshed
 
-#cv2.imwrite('img.jpg',threshed)
 
 
 #Read image from which post-its will be cropped.
 im_2_crop = cv2.imread('IMG-20130110-00370.jpg')
-#im_2_crop = cv2.imread('bp.jpg')
+#im_2_crop = cv2.imread('dog_ear2.jpg')
 
 #Convert to HSV color space.
 img = cv2.cvtColor(im_2_crop,cv2.COLOR_BGR2HSV)
 
-#img = edge_detection(img)
-#cv2.imwrite('result11.jpg',img)
-#print '\n'
 img = blob(img,im_2_crop)
 cv2.imwrite('result12.jpg',img)
