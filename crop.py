@@ -1,156 +1,142 @@
-import cv2
 import numpy as np
+import cv2
+import math
 
-"""
-	Area specifications in cv2.contourArea() in the if statements of blob() and edge_detection()
-	must be set depending on the sizes of the original image and the post-its. 
-"""
-#approx1 in def blob() returns the vertices of the square post-its in an un-uniform clockwise manner.
-#This function standardizes the arrangement of vertices and gets rid of unwanted boundaries around the post-its
-def get_square(square):
-	#organise
-	min_row = square[::,::,1::].min()
-	max_row = square[::,::,1::].max()
-	min_col = square[::,::,0:1:].min()
-	max_col = square[::,::,0:1:].max()
-	mean_row = (min_row+max_row)/2
-	mean_col = (min_col+max_col)/2
+#Opencv does not returns vertices in a unique order.
+#This function brings about a known order;
+#TOP LEFT - TOP RIGHT - BOTTOM RIGHT - BOTTOM LEFT.
+def rectify(h):
+  h = h.reshape((4,2))
+  hnew = np.zeros((4,2),dtype = np.float32)
 
+  add = h.sum(1)
+  hnew[0] = h[np.argmin(add)]
+  hnew[2] = h[np.argmax(add)]
 
-	col0 = square[0,0,0]
-	row0 = square[0,0,1]
-	col1 = square[1,0,0] 
-	row1 = square[1,0,1] 
-	col2 = square[2,0,0]
-	row2 = square[2,0,1] 
-	col3 = square[3,0,0] 
-	row3 = square[3,0,1] 
+  diff = np.diff(h,axis = 1)
+  hnew[1] = h[np.argmin(diff)]
+  hnew[3] = h[np.argmax(diff)]
+  return hnew
 
+#This function addresses the skewness of post-its.
+#Argument 'skew_im' is an outline of a post-it along the vertices.
+def get_square(skew_im, name):
 
-	#organise 
-	#Our standard:The first vertex is the top right one.
-	#The we go counter clockwise for the other vertices
+	skew_im_copy = skew_im.copy()
+	skew_im_copy = cv2.cvtColor(skew_im_copy,cv2.COLOR_BGR2HSV)	
+	warp = cv2.resize(skew_im,(450,450))
 
-	#if first vertex is at top left corner.
-	if square[0][0][0]<mean_col and square[0][0][1]<mean_row:
-		
-		square[0,0,0] = col3
-		square[0,0,1] = row3
-		square[1,0,0] = col0
-		square[1,0,1] = row0
-		square[2,0,0] = col1
-		square[2,0,1] = row1
-		square[3,0,0] = col2
-		square[3,0,1] = row2
+	if name == 'b':
+		BLUE_MIN = np.array([80, 65, 65],np.uint8)
+		BLUE_MAX = np.array([130, 255, 255],np.uint8)
+		threshed = cv2.inRange(skew_im_copy, BLUE_MIN, BLUE_MAX)
+
+	if name =='p':
+		PINK_MIN = np.array([120, 50, 50],np.uint8)
+		PINK_MAX = np.array([180, 255, 255],np.uint8)
+		threshed = cv2.inRange(skew_im_copy , PINK_MIN, PINK_MAX)
+
+	if name == 'g':
+		GREEN_MIN = np.array([35, 60, 60],np.uint8)
+		GREEN_MAX = np.array([80, 255, 255],np.uint8)
+		threshed = cv2.inRange(skew_im_copy, GREEN_MIN, GREEN_MAX)
 	
-	#if first vertex is at bottom left corner.
-	if square[0][0][0]<mean_col and square[0][0][1]>mean_row:
-
-		square[0,0,0] = col2
-		square[0,0,1] = row2
-		square[1,0,0] = col3
-		square[1,0,1] = row3
-		square[2,0,0] = col0
-		square[2,0,1] = row0
-		square[3,0,0] = col1
-		square[3,0,1] = row1
-		
-
-	#if first vertex is at bottom right corner.
-	if square[0][0][0]>mean_col and square[0][0][1]>mean_row:
-
-		square[0,0,0] = col1
-		square[0,0,1] = row1
-		square[1,0,0] = col2
-		square[1,0,1] = row2
-		square[2,0,0] = col3
-		square[2,0,1] = row3
-		square[3,0,0] = col0
-		square[3,0,1] = row0
-
-
-	if square[0][0][1]>square[1][0][1]:
-		square[1][0][1] = square[0][0][1]
-	else:
-		square[0][0][1] = square[1][0][1]	
-
-	if square[2][0][1]>square[3][0][1]:
-		square[2][0][1] = square[3][0][1]
-	else:
-		square[3][0][1] = square[2][0][1]	
-
-	if square[1][0][0]>square[2][0][0]:
-		square[2][0][0] = square[1][0][0]
-	else:
-		square[1][0][0] = square[2][0][0]	
-
-	if square[0][0][0]>square[3][0][0]:
-		square[0][0][0] = square[3][0][0]
-	else:
-		square[3][0][0] = square[0][0][0]	
-
-	return square
-
-
-
-#'img' must be in HSV format
-def blob(img,original_image):
-	#Remove noise.
-	img = cv2.medianBlur(img,21)
-	img = cv2.GaussianBlur(img,(0,0),3)
-
-	#Color blobbing for blue in opencv hsv format.
-	BLUE_MIN = np.array([80, 65, 65],np.uint8)
-	BLUE_MAX = np.array([130, 255, 255],np.uint8)
-	blue_threshed = cv2.inRange(img, BLUE_MIN, BLUE_MAX)
-	#cv2.imwrite('blue.jpg',blue_threshed)
-
-	#Color blobbing for pink and purple in opencv hsv format.
-	PINK_MIN = np.array([120, 90, 90],np.uint8)
-	PINK_MAX = np.array([180, 255, 255],np.uint8)
-	pur_pink_threshed = cv2.inRange(img	, PINK_MIN, PINK_MAX)
-	#cv2.imwrite('pur_pink.jpg',pur_pink_threshed)
-
-	#Color blobbing for green in opencv hsv format.
-	GREEN_MIN = np.array([35, 65, 65],np.uint8)
-	GREEN_MAX = np.array([80, 255, 255],np.uint8)
-	green_threshed = cv2.inRange(img, GREEN_MIN, GREEN_MAX)
-	#cv2.imwrite('green.jpg',green_threshed)
-
-	#'threshed' is  a binary image with a defined outline of all the post-its.
-	threshed = blue_threshed + pur_pink_threshed + green_threshed
-	cv2.imwrite('result10.jpg',threshed)
-
+	#Only one post-it must be detected. Check this from noOfPostIts
 	contours, hierarchy = cv2.findContours(threshed,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+	
+	noOfPostIts = 0
+	for cnt in contours:
+		approx1 = cv2.approxPolyDP(cnt,0.1*cv2.arcLength(cnt,True),True)
+		if len(approx1)==4 and cv2.contourArea(cnt) > 100000:
+			cv2.drawContours(threshed,[cnt],0,(255,255,255),2)
+			my_approx = rectify(approx1)
+			noOfPostIts += 1
+			h = np.array([ [0,0],[449,0],[449,449],[0,449] ],np.float32)
+			retval = cv2.getPerspectiveTransform(my_approx,h)
+			warp = cv2.warpPerspective(skew_im,retval,(450,450))
+	return warp
+
+
+#Find post-Its and save them.
+def square_contours(threshed_image,original,name):
+
+	contours, hierarchy = cv2.findContours(threshed_image,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 	noOfPostIts = 0
 
 	for cnt in contours:
-		approx1 = cv2.approxPolyDP(cnt,0.1*cv2.arcLength(cnt,True),True)
-		if len(approx1)==4 and cv2.contourArea(cnt) > 10000:
-			cv2.drawContours(threshed,[cnt],0,(255,255,255),2)
-			#At this point, 'threshed' will be an image that identifies only the post-its.
-			#This can be used to verify that the correct post-its will be cropped.
-			square1 = approx1
-			print square1
-			print cv2.contourArea(cnt)
+		approx = cv2.approxPolyDP(cnt,0.1*cv2.arcLength(cnt,True),True)
+		if len(approx)==4 and cv2.contourArea(cnt) > 100000:
+			cv2.drawContours(threshed_image,[cnt],0,(255,255,255),2)
+			square = approx
+			square = rectify(square)
+			min_row = square[::,1::].min()
+			max_row = square[::,1::].max()
+			min_col = square[::,0:1:].min()
+			max_col = square[::,0:1:].max()
+			skew = original[min_row:max_row:, min_col:max_col: , ::]
 			noOfPostIts += 1
-			square1 = get_square(square1)
-			temp_post = original_image[square1[1][0][1]:square1[2][0][1]:1,square1[1][0][0]:square1[0][0][0]:1,::]
-			post_name = 'k' * noOfPostIts + '.jpg'
-			#Save cropped post-its in the working directory.
+			temp_post = get_square(skew,name)
+			post_name = name * noOfPostIts + '.jpg'
 			cv2.imwrite(post_name,temp_post)
-			#cv2.imwrite(post_name,temp_post,[int(cv2.IMWRITE_JPEG_QUALITY), 90])
-	print noOfPostIts
-	return threshed
+	return threshed_image,noOfPostIts
 
+
+def blue_blobs(hsv_img,original):
+	
+	#Color blobbing for blue in opencv hsv format.
+	BLUE_MIN = np.array([80, 65, 65],np.uint8)
+	BLUE_MAX = np.array([130, 255, 255],np.uint8)
+	blue_threshed = cv2.inRange(hsv_img, BLUE_MIN, BLUE_MAX)
+	#Noise removal
+	blue_threshed = cv2.medianBlur(blue_threshed,49)
+	cv2.imwrite('blue.jpg',blue_threshed)
+	b_name = 'b'
+	b_threshed,blues = square_contours(blue_threshed , original , b_name)
+	cv2.imwrite('blue_contours.jpg',b_threshed)
+	print blues
+	return b_threshed
+
+def pink_blobs(hsv_img,original):
+	
+	#Color blobbing for pink and purple in opencv hsv format.
+	PINK_MIN = np.array([120, 50, 50],np.uint8)
+	PINK_MAX = np.array([180, 255, 255],np.uint8)
+	pur_pink_threshed = cv2.inRange(hsv_img	, PINK_MIN, PINK_MAX)
+	#Noise removal 
+	pur_pink_threshed = cv2.medianBlur(pur_pink_threshed,49)
+	cv2.imwrite('purpink.jpg',pur_pink_threshed)
+	p_name = 'p'
+	p_threshed,purpinks = square_contours(pur_pink_threshed , original, p_name)
+	cv2.imwrite('purpink_contours.jpg',p_threshed)
+	print purpinks
+	return p_threshed
+
+def green_blobs(hsv_img,original):
+	
+	#Color blobbing for green in opencv hsv format.
+	GREEN_MIN = np.array([35, 60, 60],np.uint8)
+	GREEN_MAX = np.array([80, 255, 255],np.uint8)
+	green_threshed = cv2.inRange(hsv_img, GREEN_MIN, GREEN_MAX)
+	#Noise removal
+	green_threshed = cv2.medianBlur(green_threshed,21)
+	cv2.imwrite('green.jpg',green_threshed)
+	g_name = 'g'
+	g_threshed,greens = square_contours(green_threshed , original, g_name)
+	cv2.imwrite('green_contours.jpg',g_threshed)
+	print greens
+	return g_threshed
+
+
+def blob(img):
+
+	original = img.copy()
+	img = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)	
+	blue_blobs(img,original)
+	pink_blobs(img,original)
+	green_blobs(img,original)
 
 
 #Read image from which post-its will be cropped.
 im_2_crop = cv2.imread('IMG-20130110-00370.jpg')
-#im_2_crop = cv2.imread('dog_ear2.jpg')
-
-#Convert to HSV color space.
-img = cv2.cvtColor(im_2_crop,cv2.COLOR_BGR2HSV)
-
-img = blob(img,im_2_crop)
-cv2.imwrite('result12.jpg',img)
+#im_2_crop = cv2.imread('res.jpg')
+img = blob(im_2_crop)
