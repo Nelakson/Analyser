@@ -1,0 +1,5 @@
+{
+    "blues": 7, 
+    "purpinks": 2, 
+    "greens": 1
+}
